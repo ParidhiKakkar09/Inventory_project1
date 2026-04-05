@@ -11,7 +11,7 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     df = pd.read_csv('data/cleaned_data.csv')
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['date'], format='mixed')
     return df
 
 df = load_data()
