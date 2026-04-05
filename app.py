@@ -230,7 +230,7 @@ st.dataframe(cost_df, use_container_width=True)
 cost_chart = cost_df.head(10)
 fig7 = px.bar(
     cost_chart,
-    x='Product',
+    x='Category',
     y=['Holding Cost (₹)', 'Stockout Cost (₹)'],
     barmode='group',
     title='Top 10 Products by Inventory Cost',
