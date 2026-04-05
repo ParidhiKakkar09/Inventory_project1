@@ -9,14 +9,36 @@ st.set_page_config(
 )
 
 @st.cache_data
-def load_data():
+def load_default_data():
     df = pd.read_csv('data/cleaned_data.csv')
     df['date'] = pd.to_datetime(df['date'], format='mixed')
     return df
 
-df = load_data()
-
+# ============================================================
+# CSV UPLOAD SECTION (NEW - Phase 3)
+# ============================================================
 st.title("📦 Intelligent Inventory Optimization System")
+st.markdown("---")
+
+st.subheader("📂 Upload New Inventory Data (Optional)")
+st.markdown("Upload a new CSV file to update the entire dashboard automatically. If no file is uploaded, the default dataset is used.")
+
+uploaded_file = st.file_uploader(
+    "Upload CSV file",
+    type=['csv']
+)
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    df['date'] = pd.to_datetime(df['date'], format='mixed')
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_').str.replace('/', '_')
+    if 'reorder_alert' not in df.columns:
+        df['reorder_alert'] = df['inventory_level'].apply(lambda x: 'Yes' if x < 100 else 'No')
+    st.success(f"✅ New data uploaded successfully! {len(df):,} rows loaded.")
+else:
+    df = load_default_data()
+    st.info("ℹ️ Using default dataset — 73,100 rows loaded.")
+
 st.markdown("---")
 
 # ============================================================
@@ -24,28 +46,24 @@ st.markdown("---")
 # ============================================================
 st.sidebar.title("🔧 Filters")
 
-# 1. Category Filter
 category = st.sidebar.multiselect(
     "Select Category",
     options=df['category'].unique(),
     default=df['category'].unique()
 )
 
-# 2. Region Filter
 region = st.sidebar.multiselect(
     "Select Region",
     options=df['region'].unique(),
     default=df['region'].unique()
 )
 
-# 3. Store Filter (NEW)
 store = st.sidebar.multiselect(
     "Select Store",
     options=sorted(df['store_id'].unique()),
     default=sorted(df['store_id'].unique())
 )
 
-# 4. Date Range Slider (NEW)
 st.sidebar.markdown("### 📅 Date Range")
 min_date = df['date'].min().date()
 max_date = df['date'].max().date()
@@ -56,7 +74,6 @@ start_date, end_date = st.sidebar.date_input(
     max_value=max_date
 )
 
-# Apply all filters
 filtered_df = df[
     (df['category'].isin(category)) &
     (df['region'].isin(region)) &
@@ -134,7 +151,7 @@ st.plotly_chart(fig5, use_container_width=True)
 st.markdown("---")
 
 # ============================================================
-# WHAT-IF SCENARIO (NEW)
+# WHAT-IF SCENARIO
 # ============================================================
 st.subheader("🔮 What-If Scenario — Discount Impact on Sales")
 st.markdown("Move the slider to see how changing discount affects predicted sales")
@@ -176,7 +193,7 @@ st.plotly_chart(fig6, use_container_width=True)
 st.markdown("---")
 
 # ============================================================
-# LIVE REORDER RECOMMENDATIONS (NEW)
+# LIVE REORDER RECOMMENDATIONS
 # ============================================================
 st.subheader("🚨 Live Reorder Recommendations")
 st.markdown("Products that need to be reordered RIGHT NOW based on current stock levels")
@@ -208,7 +225,7 @@ st.dataframe(reorder_df, use_container_width=True)
 st.markdown("---")
 
 # ============================================================
-# CSV DOWNLOAD BUTTON (NEW)
+# CSV DOWNLOAD BUTTON
 # ============================================================
 st.subheader("📥 Download Filtered Data")
 
