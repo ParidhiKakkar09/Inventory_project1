@@ -15,7 +15,7 @@ def load_default_data():
     return df
 
 # ============================================================
-# CSV UPLOAD SECTION (NEW - Phase 3)
+# CSV UPLOAD SECTION
 # ============================================================
 st.title("📦 Intelligent Inventory Optimization System")
 st.markdown("---")
@@ -23,10 +23,7 @@ st.markdown("---")
 st.subheader("📂 Upload New Inventory Data (Optional)")
 st.markdown("Upload a new CSV file to update the entire dashboard automatically. If no file is uploaded, the default dataset is used.")
 
-uploaded_file = st.file_uploader(
-    "Upload CSV file",
-    type=['csv']
-)
+uploaded_file = st.file_uploader("Upload CSV file", type=['csv'])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
@@ -193,10 +190,64 @@ st.plotly_chart(fig6, use_container_width=True)
 st.markdown("---")
 
 # ============================================================
-# LIVE REORDER RECOMMENDATIONS
+# PHASE 4 — COST OPTIMIZATION (NEW)
 # ============================================================
-st.subheader("🚨 Live Reorder Recommendations")
-st.markdown("Products that need to be reordered RIGHT NOW based on current stock levels")
+st.subheader("💰 Cost Optimization Analysis")
+st.markdown("Identifies which products are costing the most money due to overstock or understock")
+
+cost_df = filtered_df.groupby(['store_id', 'product_id', 'category']).agg(
+    avg_inventory=('inventory_level', 'mean'),
+    avg_units_sold=('units_sold', 'mean'),
+    avg_price=('price', 'mean')
+).reset_index()
+
+# Holding cost = 2% of price per unit sitting in stock
+cost_df['holding_cost'] = (cost_df['avg_inventory'] * cost_df['avg_price'] * 0.02).round(2)
+
+# Stockout cost = difference between sold and inventory × 10% penalty
+cost_df['stockout_cost'] = (
+    (cost_df['avg_units_sold'] - cost_df['avg_inventory']).clip(lower=0) *
+    cost_df['avg_price'] * 0.10
+).round(2)
+
+# Total cost
+cost_df['total_cost'] = (cost_df['holding_cost'] + cost_df['stockout_cost']).round(2)
+
+# Recommendation
+cost_df['recommendation'] = cost_df.apply(
+    lambda row: '🔴 Reduce Stock — Overstock' if row['holding_cost'] > row['stockout_cost']
+    else '🟡 Increase Stock — Understock', axis=1
+)
+
+cost_df = cost_df.sort_values('total_cost', ascending=False).head(20)
+cost_df.columns = ['Store', 'Product', 'Category', 'Avg Inventory',
+                    'Avg Units Sold', 'Avg Price', 'Holding Cost (₹)',
+                    'Stockout Cost (₹)', 'Total Cost (₹)', 'Recommendation']
+
+st.dataframe(cost_df, use_container_width=True)
+
+# Cost chart
+cost_chart = cost_df.head(10)
+fig7 = px.bar(
+    cost_chart,
+    x='Product',
+    y=['Holding Cost (₹)', 'Stockout Cost (₹)'],
+    barmode='group',
+    title='Top 10 Products by Inventory Cost',
+    color_discrete_map={
+        'Holding Cost (₹)': '#EF553B',
+        'Stockout Cost (₹)': '#636EFA'
+    }
+)
+st.plotly_chart(fig7, use_container_width=True)
+
+st.markdown("---")
+
+# ============================================================
+# PHASE 4 — REORDER OPTIMIZATION (NEW)
+# ============================================================
+st.subheader("📦 Reorder Optimization")
+st.markdown("Tells you exactly WHEN to reorder and HOW MUCH to order with priority levels")
 
 reorder_df = filtered_df[filtered_df['reorder_alert'] == 'Yes'].groupby(
     ['store_id', 'product_id', 'category']
@@ -214,13 +265,93 @@ reorder_df['recommended_order_qty'] = (
     reorder_df['avg_daily_sales'] * 30
 ).round(0).astype(int)
 
-reorder_df = reorder_df.sort_values('days_until_stockout').head(20)
+# Priority levels
+reorder_df['priority'] = reorder_df['days_until_stockout'].apply(
+    lambda x: '🔴 Critical — Order Today' if x <= 1
+    else ('🟡 Warning — Order This Week' if x <= 3
+    else '🟢 OK — Monitor')
+)
+
+reorder_df = reorder_df.sort_values('days_until_stockout')
 reorder_df.columns = ['Store', 'Product', 'Category',
                        'Avg Inventory', 'Avg Daily Sales',
                        'Avg Units Ordered', 'Days Until Stockout',
-                       'Recommended Order Qty']
+                       'Recommended Order Qty', 'Priority']
 
-st.dataframe(reorder_df, use_container_width=True)
+st.dataframe(reorder_df.head(20), use_container_width=True)
+
+st.markdown("---")
+
+# ============================================================
+# PHASE 4 — DEMAND BASED STOCK OPTIMIZATION (NEW)
+# ============================================================
+st.subheader("📊 Demand Based Stock Optimization")
+st.markdown("Recommends ideal stock levels per category per season to avoid overstock and understock")
+
+season_opt = filtered_df.groupby(['category', 'seasonality']).agg(
+    avg_demand=('demand_forecast', 'mean'),
+    avg_actual_sales=('units_sold', 'mean'),
+    avg_current_stock=('inventory_level', 'mean')
+).reset_index()
+
+# Optimal stock = average demand × 1.2 (20% safety buffer)
+season_opt['optimal_stock'] = (season_opt['avg_demand'] * 1.2).round(0)
+
+# Stock status
+season_opt['stock_status'] = season_opt.apply(
+    lambda row: '🔴 Overstock — Reduce Order' if row['avg_current_stock'] > row['optimal_stock'] * 1.3
+    else ('🟡 Understock — Increase Order' if row['avg_current_stock'] < row['optimal_stock'] * 0.7
+    else '🟢 Optimal Stock Level'), axis=1
+)
+
+season_opt.columns = ['Category', 'Season', 'Avg Demand',
+                       'Avg Actual Sales', 'Avg Current Stock',
+                       'Optimal Stock Level', 'Stock Status']
+
+st.dataframe(season_opt, use_container_width=True)
+
+# Visualization
+fig8 = px.bar(
+    season_opt,
+    x='Category',
+    y=['Avg Current Stock', 'Optimal Stock Level'],
+    barmode='group',
+    facet_col='Season',
+    title='Current Stock vs Optimal Stock Level by Category and Season'
+)
+st.plotly_chart(fig8, use_container_width=True)
+
+st.markdown("---")
+
+# ============================================================
+# LIVE REORDER RECOMMENDATIONS
+# ============================================================
+st.subheader("🚨 Live Reorder Recommendations")
+st.markdown("Products that need to be reordered RIGHT NOW based on current stock levels")
+
+live_reorder = filtered_df[filtered_df['reorder_alert'] == 'Yes'].groupby(
+    ['store_id', 'product_id', 'category']
+).agg(
+    avg_inventory=('inventory_level', 'mean'),
+    avg_daily_sales=('units_sold', 'mean'),
+    avg_units_ordered=('units_ordered', 'mean')
+).reset_index()
+
+live_reorder['days_until_stockout'] = (
+    live_reorder['avg_inventory'] / live_reorder['avg_daily_sales']
+).round(1)
+
+live_reorder['recommended_order_qty'] = (
+    live_reorder['avg_daily_sales'] * 30
+).round(0).astype(int)
+
+live_reorder = live_reorder.sort_values('days_until_stockout').head(20)
+live_reorder.columns = ['Store', 'Product', 'Category',
+                         'Avg Inventory', 'Avg Daily Sales',
+                         'Avg Units Ordered', 'Days Until Stockout',
+                         'Recommended Order Qty']
+
+st.dataframe(live_reorder, use_container_width=True)
 
 st.markdown("---")
 
