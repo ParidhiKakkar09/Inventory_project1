@@ -133,21 +133,6 @@ with col4:
 st.markdown("---")
 
 # ============================================================
-# DEMAND FORECAST CHART
-# ============================================================
-st.subheader("Demand Forecast vs Actual Sales")
-monthly = filtered_df.groupby('date').agg(
-    actual_sales=('units_sold', 'sum'),
-    forecast=('demand_forecast', 'sum')
-).reset_index()
-monthly['moving_avg'] = monthly['actual_sales'].rolling(3).mean()
-fig5 = px.line(monthly, x='date', y=['actual_sales', 'forecast', 'moving_avg'],
-               title='Demand Forecast vs Actual Sales')
-st.plotly_chart(fig5, use_container_width=True)
-
-st.markdown("---")
-
-# ============================================================
 # WHAT-IF SCENARIO
 # ============================================================
 st.subheader("🔮 What-If Scenario — Discount Impact on Sales")
