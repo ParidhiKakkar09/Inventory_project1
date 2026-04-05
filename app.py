@@ -396,18 +396,41 @@ forecast_df['forecast'] = None
 combined_df = pd.concat([forecast_df, future_df], ignore_index=True)
 
 # Plot
-fig9 = px.line(
-    combined_df,
-    x='date',
-    y=['actual_sales', 'moving_avg', 'forecast'],
+import plotly.graph_objects as go
+
+fig9 = go.Figure()
+
+# Blue line - Actual Sales
+fig9.add_trace(go.Scatter(
+    x=forecast_df['date'],
+    y=forecast_df['actual_sales'],
+    name='Actual Sales',
+    line=dict(color='#636EFA', width=2)
+))
+
+# Orange line - Moving Average
+fig9.add_trace(go.Scatter(
+    x=forecast_df['date'],
+    y=forecast_df['moving_avg'],
+    name='Moving Average',
+    line=dict(color='#FFA15A', width=2)
+))
+
+# Green dotted line - 3 Month Forecast
+fig9.add_trace(go.Scatter(
+    x=future_dates,
+    y=[round(last_3_avg, 0)] * 3,
+    name='3 Month Forecast',
+    line=dict(color='#00CC96', width=3, dash='dot')
+))
+
+fig9.update_layout(
     title='Demand Forecast — Past Sales + Next 3 Months Prediction',
-    labels={'value': 'Units Sold', 'date': 'Date'},
-    color_discrete_map={
-        'actual_sales': '#636EFA',
-        'moving_avg': '#FFA15A',
-        'forecast': '#00CC96'
-    }
+    xaxis_title='Date',
+    yaxis_title='Units Sold'
 )
+
+st.plotly_chart(fig9, use_container_width=True)
 fig9.update_traces(
     selector=dict(name='forecast'),
     line=dict(dash='dot', width=3)
