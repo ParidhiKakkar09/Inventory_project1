@@ -240,6 +240,7 @@ fig7 = px.bar(
     }
 )
 st.plotly_chart(fig7, use_container_width=True)
+st.info("ℹ️ Stockout Cost is near zero across all products — indicating an overstock situation in this retail store. Focus should be on reducing holding costs by optimizing order quantities.")
 
 st.markdown("---")
 
