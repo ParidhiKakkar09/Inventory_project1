@@ -355,6 +355,79 @@ live_reorder.columns = ['Store', 'Product', 'Category',
 st.dataframe(live_reorder, use_container_width=True)
 
 st.markdown("---")
+# ============================================================
+# PHASE 5 — DEMAND FORECASTING (MOVING AVERAGE)
+# ============================================================
+st.subheader("📈 Demand Forecasting — Next 3 Months")
+st.markdown("Based on historical sales patterns, predicting future demand using Moving Average method")
+
+# Prepare monthly data
+forecast_df = filtered_df.groupby('date').agg(
+    actual_sales=('units_sold', 'sum')
+).reset_index().sort_values('date')
+
+# Calculate 3-month moving average for past data
+forecast_df['moving_avg'] = forecast_df['actual_sales'].rolling(3).mean()
+
+# Calculate MAE and RMSE
+mae_df = forecast_df.dropna(subset=['moving_avg'])
+mae = round((mae_df['actual_sales'] - mae_df['moving_avg']).abs().mean(), 2)
+rmse = round(((mae_df['actual_sales'] - mae_df['moving_avg'])**2).mean()**0.5, 2)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("MAE (Mean Absolute Error)", f"{mae} units")
+with col2:
+    st.metric("RMSE (Root Mean Square Error)", f"{rmse} units")
+
+# Generate next 3 months forecast
+last_3_avg = forecast_df['actual_sales'].tail(3).mean()
+last_date = forecast_df['date'].max()
+
+future_dates = [last_date + pd.DateOffset(months=i) for i in range(1, 4)]
+future_df = pd.DataFrame({
+    'date': future_dates,
+    'actual_sales': [None, None, None],
+    'moving_avg': [None, None, None],
+    'forecast': [round(last_3_avg, 0)] * 3
+})
+
+forecast_df['forecast'] = None
+combined_df = pd.concat([forecast_df, future_df], ignore_index=True)
+
+# Plot
+fig9 = px.line(
+    combined_df,
+    x='date',
+    y=['actual_sales', 'moving_avg', 'forecast'],
+    title='Demand Forecast — Past Sales + Next 3 Months Prediction',
+    labels={'value': 'Units Sold', 'date': 'Date'},
+    color_discrete_map={
+        'actual_sales': '#636EFA',
+        'moving_avg': '#FFA15A',
+        'forecast': '#00CC96'
+    }
+)
+fig9.update_traces(
+    selector=dict(name='forecast'),
+    line=dict(dash='dot', width=3)
+)
+fig9.update_traces(
+    selector=dict(name='actual_sales'),
+    name='Actual Sales'
+)
+fig9.update_traces(
+    selector=dict(name='moving_avg'),
+    name='Moving Average'
+)
+fig9.update_traces(
+    selector=dict(name='forecast'),
+    name='3 Month Forecast'
+)
+st.plotly_chart(fig9, use_container_width=True)
+st.info("ℹ️ Forecast is based on 3-Month Moving Average of historical sales. Lower MAE and RMSE indicate better prediction accuracy.")
+
+st.markdown("---")
 
 # ============================================================
 # CSV DOWNLOAD BUTTON
